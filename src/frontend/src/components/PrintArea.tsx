@@ -13,10 +13,9 @@ interface Props {
   staff: Staff[];
   students: Student[];
   misc: MiscCharge[];
-  feeAmount: number;
 }
 
-export default function PrintArea({ staff, students, misc, feeAmount }: Props) {
+export default function PrintArea({ staff, students, misc }: Props) {
   const now = new Date();
   const monthYear = now.toLocaleString("default", {
     month: "long",
@@ -25,6 +24,18 @@ export default function PrintArea({ staff, students, misc, feeAmount }: Props) {
   const totalPayroll = staff.reduce((a, s) => a + calcFinalSalary(s), 0);
   const totalDeductions = staff.reduce((a, s) => a + calcDeduction(s), 0);
   const totalMisc = misc.reduce((a, c) => a + c.amount, 0);
+
+  const studentTotalPaid = (s: Student) => {
+    let total = 0;
+    for (const m of MONTHS) {
+      if (s.fees[m]) total += s.classFee;
+      if (s.generatorCharge > 0 && s.generatorFees[m])
+        total += s.generatorCharge;
+      if (s.transportCharge > 0 && s.transportFees[m])
+        total += s.transportCharge;
+    }
+    return total;
+  };
 
   return (
     <div id="print-area" style={{ display: "none" }}>
@@ -174,96 +185,126 @@ export default function PrintArea({ staff, students, misc, feeAmount }: Props) {
         >
           <thead>
             <tr style={{ background: "#f0f0f0" }}>
-              <th
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "5px 6px",
-                  textAlign: "left",
-                }}
-              >
-                #
-              </th>
-              <th
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "5px 6px",
-                  textAlign: "left",
-                }}
-              >
-                Name
-              </th>
-              <th
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "5px 6px",
-                  textAlign: "left",
-                }}
-              >
-                Class
-              </th>
-              {MONTHS.map((m) => (
+              {[
+                "#",
+                "Name",
+                "Class",
+                "Tuition/mo",
+                "Gen/mo",
+                "Transport/mo",
+                ...MONTHS,
+                `Total Paid (${INR})`,
+              ].map((h) => (
                 <th
-                  key={m}
+                  key={h}
                   style={{
                     border: "1px solid #ccc",
                     padding: "5px 4px",
                     textAlign: "center",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  {m}
+                  {h}
                 </th>
               ))}
-              <th
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "5px 6px",
-                  textAlign: "left",
-                }}
-              >
-                Total ({INR})
-              </th>
             </tr>
           </thead>
           <tbody>
-            {students.map((s, i) => {
-              const paidCount = Object.values(s.fees).filter(Boolean).length;
-              return (
-                <tr key={s.id}>
-                  <td style={{ border: "1px solid #ccc", padding: "4px 6px" }}>
-                    {i + 1}
-                  </td>
-                  <td style={{ border: "1px solid #ccc", padding: "4px 6px" }}>
-                    {s.name}
-                  </td>
-                  <td style={{ border: "1px solid #ccc", padding: "4px 6px" }}>
-                    {s.grade}
-                  </td>
-                  {MONTHS.map((m) => (
-                    <td
-                      key={m}
-                      style={{
-                        border: "1px solid #ccc",
-                        padding: "4px",
-                        textAlign: "center",
-                        background: s.fees[m] ? "#d4edda" : "#f8d7da",
-                        fontSize: "10px",
-                      }}
-                    >
-                      {s.fees[m] ? "✓" : "✗"}
-                    </td>
-                  ))}
+            {students.map((s, i) => (
+              <tr key={s.id}>
+                <td
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: "4px 6px",
+                    textAlign: "center",
+                  }}
+                >
+                  {i + 1}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px 6px" }}>
+                  {s.name}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px 6px" }}>
+                  {s.grade}
+                </td>
+                <td
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: "4px 6px",
+                    textAlign: "right",
+                  }}
+                >
+                  {INR}
+                  {fmt(s.classFee)}
+                </td>
+                <td
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: "4px 6px",
+                    textAlign: "right",
+                  }}
+                >
+                  {s.generatorCharge > 0
+                    ? `${INR}${fmt(s.generatorCharge)}`
+                    : "—"}
+                </td>
+                <td
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: "4px 6px",
+                    textAlign: "right",
+                  }}
+                >
+                  {s.transportCharge > 0
+                    ? `${INR}${fmt(s.transportCharge)}`
+                    : "—"}
+                </td>
+                {MONTHS.map((m) => (
                   <td
+                    key={m}
                     style={{
                       border: "1px solid #ccc",
-                      padding: "4px 6px",
-                      fontWeight: "bold",
+                      padding: "3px 2px",
+                      textAlign: "center",
+                      background: s.fees[m] ? "#d4edda" : "#f8d7da",
+                      fontSize: "9px",
                     }}
                   >
-                    {INR} {fmt(paidCount * feeAmount)}
+                    {s.fees[m] ? "T✓" : "T✗"}
+                    {s.generatorCharge > 0 && (
+                      <span
+                        style={{
+                          display: "block",
+                          color: s.generatorFees[m] ? "#856404" : "#999",
+                        }}
+                      >
+                        {s.generatorFees[m] ? "G✓" : "G✗"}
+                      </span>
+                    )}
+                    {s.transportCharge > 0 && (
+                      <span
+                        style={{
+                          display: "block",
+                          color: s.transportFees[m] ? "#0c5460" : "#999",
+                        }}
+                      >
+                        {s.transportFees[m] ? "Tr✓" : "Tr✗"}
+                      </span>
+                    )}
                   </td>
-                </tr>
-              );
-            })}
+                ))}
+                <td
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: "4px 6px",
+                    fontWeight: "bold",
+                    textAlign: "right",
+                  }}
+                >
+                  {INR} {fmt(studentTotalPaid(s))}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
 

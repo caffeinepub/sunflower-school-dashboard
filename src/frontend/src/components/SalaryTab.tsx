@@ -48,6 +48,8 @@ export default function SalaryTab({ staff, setStaff }: Props) {
       baseSalary: 15000,
       totalDays: 30,
       daysPresent: 30,
+      phone: "",
+      address: "",
     };
     setStaff((prev) => [...prev, newStaff]);
   }, [setStaff]);
@@ -128,6 +130,8 @@ export default function SalaryTab({ staff, setStaff }: Props) {
                 "#",
                 "Staff Name",
                 "Designation",
+                "Phone",
+                "Address",
                 `Base Salary (${INR})`,
                 "Total Days",
                 "Days Present",
@@ -175,6 +179,28 @@ export default function SalaryTab({ staff, setStaff }: Props) {
                       placeholder="Designation"
                       onChange={(e) =>
                         updateStaff(s.id, "designation", e.target.value)
+                      }
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="tel"
+                      data-ocid={`salary.phone_input.${ocidIdx}`}
+                      className="hud-input w-32 px-2 py-1 rounded-sm"
+                      value={s.phone ?? ""}
+                      placeholder="Phone No."
+                      onChange={(e) =>
+                        updateStaff(s.id, "phone", e.target.value)
+                      }
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <input
+                      className="hud-input w-40 px-2 py-1 rounded-sm"
+                      value={s.address ?? ""}
+                      placeholder="Address"
+                      onChange={(e) =>
+                        updateStaff(s.id, "address", e.target.value)
                       }
                     />
                   </td>
@@ -235,7 +261,7 @@ export default function SalaryTab({ staff, setStaff }: Props) {
             {/* Totals row */}
             <tr className="border-t border-white/20 bg-white/[0.02]">
               <td
-                colSpan={3}
+                colSpan={5}
                 className="px-3 py-3 text-xs font-medium text-[#a0a0a0] tracking-widest uppercase"
               >
                 TOTALS

@@ -22,9 +22,11 @@ const EMPTY_FORM: Omit<StudentDetail, "id"> = {
   age: "",
   bloodGroup: "A+",
   fatherName: "",
+  fatherPhone: "",
   motherName: "",
   grade: "",
   photo: "",
+  address: "",
 };
 
 function BloodBadge({ group }: { group: BloodGroup }) {
@@ -182,9 +184,32 @@ function StudentCard({
         </div>
         <div>
           <p className="text-[#a0a0a0] tracking-wider uppercase text-[10px] mb-0.5">
+            Father's Phone
+          </p>
+          {student.fatherPhone ? (
+            <a
+              href={`tel:${student.fatherPhone}`}
+              className="text-[#00f5ff] font-mono hover:underline"
+            >
+              {student.fatherPhone}
+            </a>
+          ) : (
+            <p className="text-white font-mono">—</p>
+          )}
+        </div>
+        <div>
+          <p className="text-[#a0a0a0] tracking-wider uppercase text-[10px] mb-0.5">
             Mother
           </p>
           <p className="text-white truncate">{student.motherName || "—"}</p>
+        </div>
+        <div className="col-span-2">
+          <p className="text-[#a0a0a0] tracking-wider uppercase text-[10px] mb-0.5">
+            Address
+          </p>
+          <p className="text-white text-xs leading-relaxed">
+            {student.address || "—"}
+          </p>
         </div>
       </div>
     </motion.div>
@@ -225,9 +250,11 @@ function DetailForm({
     name: `${uid}-name`,
     age: `${uid}-age`,
     fatherName: `${uid}-fatherName`,
+    fatherPhone: `${uid}-fatherPhone`,
     motherName: `${uid}-motherName`,
     grade: `${uid}-grade`,
     bloodGroup: `${uid}-bloodGroup`,
+    address: `${uid}-address`,
   };
 
   return (
@@ -293,6 +320,7 @@ function DetailForm({
             ["name", "Full Name", "text"],
             ["age", "Age", "number"],
             ["fatherName", "Father's Name", "text"],
+            ["fatherPhone", "Father's Phone", "tel"],
             ["motherName", "Mother's Name", "text"],
             ["grade", "Class / Grade", "text"],
           ] as [keyof typeof fieldIds & keyof typeof form, string, string][]
@@ -308,7 +336,7 @@ function DetailForm({
               id={fieldIds[field]}
               type={type}
               className="hud-input w-full px-2.5 py-1.5 rounded-sm"
-              value={form[field] as string}
+              value={(form[field] as string) ?? ""}
               placeholder={label}
               onChange={(e) => set(field, e.target.value as never)}
             />
@@ -335,6 +363,24 @@ function DetailForm({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Address */}
+        <div className="sm:col-span-2 lg:col-span-3">
+          <label
+            htmlFor={fieldIds.address}
+            className="block text-[10px] text-[#a0a0a0] tracking-widest uppercase mb-1"
+          >
+            Address
+          </label>
+          <textarea
+            id={fieldIds.address}
+            className="hud-input w-full px-2.5 py-1.5 rounded-sm resize-none"
+            rows={2}
+            value={form.address ?? ""}
+            placeholder="Full Address"
+            onChange={(e) => set("address", e.target.value)}
+          />
         </div>
       </div>
 
