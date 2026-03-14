@@ -3,6 +3,7 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  GraduationCapIcon,
   PlusIcon,
   PrinterIcon,
   SearchIcon,
@@ -12,7 +13,7 @@ import {
   XIcon,
   ZapIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   INR,
   MONTHS,
@@ -26,6 +27,7 @@ interface Props {
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentDetails: StudentDetail[];
+  initialSearch?: string;
 }
 
 const currentMonthName = new Date().toLocaleString("default", {
@@ -49,15 +51,17 @@ function ReceiptModal({
     year: "numeric",
   });
 
-  // Months that are paid for tuition
+  // Months that are paid for each charge
   const paidTuitionMonths = MONTHS.filter((m) => student.fees[m]);
   const paidGenMonths = MONTHS.filter((m) => student.generatorFees[m]);
   const paidTransMonths = MONTHS.filter((m) => student.transportFees[m]);
+  const paidExamMonths = MONTHS.filter((m) => student.examFees?.[m]);
 
   const tuitionTotal = paidTuitionMonths.length * student.classFee;
   const genTotal = paidGenMonths.length * student.generatorCharge;
   const transTotal = paidTransMonths.length * student.transportCharge;
-  const grandTotal = tuitionTotal + genTotal + transTotal;
+  const examTotal = paidExamMonths.length * (student.examCharge ?? 0);
+  const grandTotal = tuitionTotal + genTotal + transTotal + examTotal;
 
   const handlePrint = () => {
     const printContents =
@@ -264,7 +268,37 @@ function ReceiptModal({
                     </div>
                     <div style={{ fontWeight: "bold" }}>{student.grade}</div>
                   </div>
-                  {detail?.fatherName && (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#555",
+                        textTransform: "uppercase",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Father's Name
+                    </div>
+                    <div style={{ fontWeight: "bold" }}>
+                      {detail?.fatherName || "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#555",
+                        textTransform: "uppercase",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Father's Phone
+                    </div>
+                    <div style={{ fontWeight: "bold" }}>
+                      {detail?.fatherPhone || "—"}
+                    </div>
+                  </div>
+                  {detail?.motherName && (
                     <div>
                       <div
                         style={{
@@ -274,14 +308,14 @@ function ReceiptModal({
                           letterSpacing: "1px",
                         }}
                       >
-                        Father's Name
+                        Mother's Name
                       </div>
                       <div style={{ fontWeight: "bold" }}>
-                        {detail.fatherName}
+                        {detail.motherName}
                       </div>
                     </div>
                   )}
-                  {detail?.fatherPhone && (
+                  {detail?.age && (
                     <div>
                       <div
                         style={{
@@ -291,11 +325,43 @@ function ReceiptModal({
                           letterSpacing: "1px",
                         }}
                       >
-                        Father's Phone
+                        Age
                       </div>
                       <div style={{ fontWeight: "bold" }}>
-                        {detail.fatherPhone}
+                        {detail.age} years
                       </div>
+                    </div>
+                  )}
+                  {detail?.bloodGroup && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#555",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                        }}
+                      >
+                        Blood Group
+                      </div>
+                      <div style={{ fontWeight: "bold" }}>
+                        {detail.bloodGroup}
+                      </div>
+                    </div>
+                  )}
+                  {detail?.address && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#555",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                        }}
+                      >
+                        Address
+                      </div>
+                      <div style={{ fontWeight: "bold" }}>{detail.address}</div>
                     </div>
                   )}
                 </div>
@@ -426,9 +492,87 @@ function ReceiptModal({
                       </td>
                     </tr>
                   )}
+                  {paidExamMonths.length > 0 && (
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "8px 10px" }}>
+                        Examination Fee ({INR}
+                        {fmt(student.examCharge ?? 0)}/sitting)
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          fontSize: "11px",
+                          color: "#555",
+                        }}
+                      >
+                        {paidExamMonths.join(", ")}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {INR} {fmt(examTotal)}
+                      </td>
+                    </tr>
+                  )}
+                  {/* Summary of all charges per month */}
+                  {(student.classFee > 0 ||
+                    (student.generatorCharge ?? 0) > 0 ||
+                    (student.transportCharge ?? 0) > 0 ||
+                    (student.examCharge ?? 0) > 0) && (
+                    <tr
+                      style={{
+                        borderBottom: "2px solid #ddd",
+                        background: "#f9f9f9",
+                      }}
+                    >
+                      <td
+                        colSpan={2}
+                        style={{
+                          padding: "6px 10px",
+                          fontSize: "11px",
+                          color: "#555",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Monthly breakdown: Tuition {INR}
+                        {fmt(student.classFee)}
+                        {(student.generatorCharge ?? 0) > 0
+                          ? ` + Generator ${INR}${fmt(student.generatorCharge)}`
+                          : ""}
+                        {(student.transportCharge ?? 0) > 0
+                          ? ` + Transport ${INR}${fmt(student.transportCharge)}`
+                          : ""}
+                        {(student.examCharge ?? 0) > 0
+                          ? ` + Exam ${INR}${fmt(student.examCharge ?? 0)}`
+                          : ""}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 10px",
+                          textAlign: "right",
+                          fontSize: "11px",
+                          color: "#555",
+                        }}
+                      >
+                        {INR}{" "}
+                        {fmt(
+                          student.classFee +
+                            (student.generatorCharge ?? 0) +
+                            (student.transportCharge ?? 0) +
+                            (student.examCharge ?? 0),
+                        )}
+                        /mo
+                      </td>
+                    </tr>
+                  )}
                   {paidTuitionMonths.length === 0 &&
                     paidGenMonths.length === 0 &&
-                    paidTransMonths.length === 0 && (
+                    paidTransMonths.length === 0 &&
+                    paidExamMonths.length === 0 && (
                       <tr>
                         <td
                           colSpan={3}
@@ -557,8 +701,12 @@ export default function FeeTab({
   students,
   setStudents,
   studentDetails,
+  initialSearch,
 }: Props) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch ?? "");
+  useEffect(() => {
+    setSearch(initialSearch ?? "");
+  }, [initialSearch]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set(),
   );
@@ -596,7 +744,7 @@ export default function FeeTab({
     (
       studentId: string,
       month: Month,
-      field: "fees" | "generatorFees" | "transportFees",
+      field: "fees" | "generatorFees" | "transportFees" | "examFees",
     ) => {
       setStudents((prev) =>
         prev.map((s) =>
@@ -618,9 +766,11 @@ export default function FeeTab({
         classFee: 500,
         generatorCharge: 0,
         transportCharge: 0,
+        examCharge: 0,
         fees: {},
         generatorFees: {},
         transportFees: {},
+        examFees: {},
       };
       setStudents((prev) => [...prev, newStudent]);
     },
@@ -647,20 +797,24 @@ export default function FeeTab({
   const totalCollected = students.reduce((acc, s) => {
     let sum = 0;
     if (s.fees[currentMonthName]) sum += s.classFee;
-    if (s.generatorCharge > 0 && s.generatorFees[currentMonthName])
+    if ((s.generatorCharge ?? 0) > 0 && s.generatorFees[currentMonthName])
       sum += s.generatorCharge;
-    if (s.transportCharge > 0 && s.transportFees[currentMonthName])
+    if ((s.transportCharge ?? 0) > 0 && s.transportFees[currentMonthName])
       sum += s.transportCharge;
+    if ((s.examCharge ?? 0) > 0 && s.examFees?.[currentMonthName])
+      sum += s.examCharge ?? 0;
     return acc + sum;
   }, 0);
 
   const totalPending = students.reduce((acc, s) => {
     let sum = 0;
     if (!s.fees[currentMonthName]) sum += s.classFee;
-    if (s.generatorCharge > 0 && !s.generatorFees[currentMonthName])
+    if ((s.generatorCharge ?? 0) > 0 && !s.generatorFees[currentMonthName])
       sum += s.generatorCharge;
-    if (s.transportCharge > 0 && !s.transportFees[currentMonthName])
+    if ((s.transportCharge ?? 0) > 0 && !s.transportFees[currentMonthName])
       sum += s.transportCharge;
+    if ((s.examCharge ?? 0) > 0 && !s.examFees?.[currentMonthName])
+      sum += s.examCharge ?? 0;
     return acc + sum;
   }, 0);
 
@@ -668,10 +822,12 @@ export default function FeeTab({
     grpStudents.reduce((sum, s) => {
       let amount = sum;
       if (s.fees[currentMonthName]) amount += s.classFee;
-      if (s.generatorCharge > 0 && s.generatorFees[currentMonthName])
+      if ((s.generatorCharge ?? 0) > 0 && s.generatorFees[currentMonthName])
         amount += s.generatorCharge;
-      if (s.transportCharge > 0 && s.transportFees[currentMonthName])
+      if ((s.transportCharge ?? 0) > 0 && s.transportFees[currentMonthName])
         amount += s.transportCharge;
+      if ((s.examCharge ?? 0) > 0 && s.examFees?.[currentMonthName])
+        amount += s.examCharge ?? 0;
       return amount;
     }, 0);
 
@@ -679,10 +835,12 @@ export default function FeeTab({
     let total = 0;
     for (const m of MONTHS) {
       if (s.fees[m]) total += s.classFee;
-      if (s.generatorCharge > 0 && s.generatorFees[m])
+      if ((s.generatorCharge ?? 0) > 0 && s.generatorFees[m])
         total += s.generatorCharge;
-      if (s.transportCharge > 0 && s.transportFees[m])
+      if ((s.transportCharge ?? 0) > 0 && s.transportFees[m])
         total += s.transportCharge;
+      if ((s.examCharge ?? 0) > 0 && s.examFees?.[m])
+        total += s.examCharge ?? 0;
     }
     return total;
   };
@@ -923,7 +1081,7 @@ interface RowProps {
   onToggleFee: (
     id: string,
     month: Month,
-    field: "fees" | "generatorFees" | "transportFees",
+    field: "fees" | "generatorFees" | "transportFees" | "examFees",
   ) => void;
   onUpdate: <K extends keyof Student>(
     id: string,
@@ -1006,6 +1164,24 @@ function StudentRow({
             value={student.transportCharge}
             onChange={(e) =>
               onUpdate(student.id, "transportCharge", Number(e.target.value))
+            }
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <GraduationCapIcon
+            className={`w-3 h-3 ${(student.examCharge ?? 0) > 0 ? "text-purple-400" : "text-[#444]"}`}
+          />
+          <span
+            className={`text-xs whitespace-nowrap ${(student.examCharge ?? 0) > 0 ? "text-purple-400" : "text-[#444]"}`}
+          >
+            Exam {INR}
+          </span>
+          <input
+            type="number"
+            className={`hud-input w-20 px-2 py-1 rounded-sm text-xs ${(student.examCharge ?? 0) === 0 ? "opacity-40" : ""}`}
+            value={student.examCharge ?? 0}
+            onChange={(e) =>
+              onUpdate(student.id, "examCharge", Number(e.target.value))
             }
           />
         </div>
@@ -1105,6 +1281,31 @@ function StudentRow({
                     : "unpaid-cell"
                 } ${month === currentMonthName ? "ring-1 ring-white/30" : ""}`}
                 title={`Transport ${month}: ${paid ? "Paid" : "Unpaid"}`}
+              >
+                {month}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Row 5: Exam fee toggles */}
+      {(student.examCharge ?? 0) > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-xs text-purple-400 w-16 shrink-0">Exam:</span>
+          {MONTHS.map((month) => {
+            const paid = !!student.examFees?.[month];
+            return (
+              <button
+                type="button"
+                key={month}
+                onClick={() => onToggleFee(student.id, month, "examFees")}
+                className={`px-2 py-0.5 rounded-sm text-xs font-mono font-medium transition-all duration-150 select-none ${
+                  paid
+                    ? "bg-purple-500/20 border border-purple-500/40 text-purple-400"
+                    : "unpaid-cell"
+                } ${month === currentMonthName ? "ring-1 ring-white/30" : ""}`}
+                title={`Exam ${month}: ${paid ? "Paid" : "Unpaid"}`}
               >
                 {month}
               </button>

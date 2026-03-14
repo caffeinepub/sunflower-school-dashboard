@@ -48,9 +48,12 @@ export interface Student {
   generatorCharge: number;
   /** Transport charge (monthly, 0 if not a transport student) */
   transportCharge: number;
+  /** Examination fee (per sitting, 0 if not applicable) */
+  examCharge: number;
   fees: Partial<Record<Month, boolean>>;
   generatorFees: Partial<Record<Month, boolean>>;
   transportFees: Partial<Record<Month, boolean>>;
+  examFees: Partial<Record<Month, boolean>>;
 }
 
 export type BloodGroup =
@@ -117,7 +120,12 @@ export function calcDeduction(staff: Staff): number {
 
 /** Total monthly fee for a student */
 export function calcMonthlyTotal(student: Student): number {
-  return student.classFee + student.generatorCharge + student.transportCharge;
+  return (
+    student.classFee +
+    student.generatorCharge +
+    student.transportCharge +
+    student.examCharge
+  );
 }
 
 /** Format a number as Indian Rupees with 2 decimal places */

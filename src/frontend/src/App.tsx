@@ -134,9 +134,11 @@ const defaultStudents: Student[] = [
     classFee: 1200,
     generatorCharge: 200,
     transportCharge: 0,
+    examCharge: 0,
     fees: {},
     generatorFees: {},
     transportFees: {},
+    examFees: {},
   },
   {
     id: "2",
@@ -145,9 +147,11 @@ const defaultStudents: Student[] = [
     classFee: 1000,
     generatorCharge: 200,
     transportCharge: 500,
+    examCharge: 0,
     fees: { Jan: true, Feb: true, Mar: true },
     generatorFees: { Jan: true },
     transportFees: { Jan: true, Feb: true },
+    examFees: {},
   },
   {
     id: "3",
@@ -156,9 +160,11 @@ const defaultStudents: Student[] = [
     classFee: 1500,
     generatorCharge: 0,
     transportCharge: 500,
+    examCharge: 0,
     fees: { Jan: true, Feb: true },
     generatorFees: {},
     transportFees: { Jan: true },
+    examFees: {},
   },
   {
     id: "4",
@@ -167,9 +173,11 @@ const defaultStudents: Student[] = [
     classFee: 800,
     generatorCharge: 200,
     transportCharge: 0,
+    examCharge: 0,
     fees: {},
     generatorFees: {},
     transportFees: {},
+    examFees: {},
   },
   {
     id: "5",
@@ -178,9 +186,11 @@ const defaultStudents: Student[] = [
     classFee: 1800,
     generatorCharge: 200,
     transportCharge: 500,
+    examCharge: 0,
     fees: { Jan: true, Feb: true, Mar: true, Apr: true },
     generatorFees: { Jan: true, Feb: true },
     transportFees: { Jan: true, Feb: true, Mar: true },
+    examFees: {},
   },
   {
     id: "6",
@@ -189,9 +199,11 @@ const defaultStudents: Student[] = [
     classFee: 1200,
     generatorCharge: 0,
     transportCharge: 0,
+    examCharge: 0,
     fees: { Jan: true },
     generatorFees: {},
     transportFees: {},
+    examFees: {},
   },
 ];
 
@@ -280,12 +292,19 @@ const TAB_OCID: Record<TabId, string> = {
 
 function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>("salary");
+  const [feeSearch, setFeeSearch] = useState("");
   const [staff, setStaff] = useState<Staff[]>(() =>
     loadLS("sunflower_staff", defaultStaff),
   );
-  const [students, setStudents] = useState<Student[]>(() =>
-    loadLS("sunflower_students", defaultStudents),
-  );
+  const [students, setStudents] = useState<Student[]>(() => {
+    const raw = loadLS<Student[]>("sunflower_students", defaultStudents);
+    // Migrate: add examCharge/examFees for older data that lacks them
+    return raw.map((s) => ({
+      ...s,
+      examCharge: s.examCharge ?? 0,
+      examFees: s.examFees ?? {},
+    }));
+  });
   const [misc, setMisc] = useState<MiscCharge[]>(() =>
     loadLS("sunflower_misc", defaultMisc),
   );
@@ -601,6 +620,7 @@ function Dashboard() {
                 students={students}
                 setStudents={setStudents}
                 studentDetails={studentDetails}
+                initialSearch={feeSearch}
               />
             </motion.div>
           )}
@@ -617,6 +637,10 @@ function Dashboard() {
                 setDetails={setStudentDetails}
                 students={students}
                 setStudents={setStudents}
+                onGoToFeeTab={(name) => {
+                  setActiveTab("fee");
+                  setFeeSearch(name);
+                }}
               />
             </motion.div>
           )}

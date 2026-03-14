@@ -1,4 +1,5 @@
 import {
+  BookOpenIcon,
   CameraIcon,
   CheckIcon,
   PencilIcon,
@@ -9,7 +10,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import {
   BLOOD_GROUPS,
   type BloodGroup,
@@ -22,6 +23,7 @@ interface Props {
   setDetails: React.Dispatch<React.SetStateAction<StudentDetail[]>>;
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
+  onGoToFeeTab?: (studentName: string) => void;
 }
 
 const EMPTY_FORM: Omit<StudentDetail, "id"> = {
@@ -57,12 +59,14 @@ function StudentCard({
   onEdit,
   onDelete,
   onPhotoUpload,
+  onGoToFeeTab,
 }: {
   student: StudentDetail;
   idx: number;
   onEdit: (s: StudentDetail) => void;
   onDelete: (id: string) => void;
   onPhotoUpload: (id: string, dataUrl: string) => void;
+  onGoToFeeTab?: (name: string) => void;
 }) {
   const fileInputId = `photo-card-${student.id}`;
 
@@ -113,6 +117,17 @@ function StudentCard({
         >
           <Trash2Icon className="w-3.5 h-3.5" />
         </button>
+        {onGoToFeeTab && (
+          <button
+            type="button"
+            data-ocid={`details.fee_link_button.${ocidIdx}`}
+            onClick={() => onGoToFeeTab(student.name)}
+            className="p-1.5 rounded-sm text-[#a0a0a0] hover:text-[#00f5ff] hover:bg-[#00f5ff]/10 transition-all"
+            title="Open in Fee Ledger"
+          >
+            <BookOpenIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Photo + name row */}
@@ -225,13 +240,18 @@ function DetailForm({
   onSave,
   onCancel,
   isEdit,
+  availableClasses,
 }: {
   initial: Omit<StudentDetail, "id">;
   onSave: (data: Omit<StudentDetail, "id">) => void;
   onCancel: () => void;
   isEdit: boolean;
+  availableClasses: string[];
 }) {
   const [form, setForm] = useState<Omit<StudentDetail, "id">>(initial);
+  const [isNewClass, setIsNewClass] = useState(
+    initial.grade !== "" && !availableClasses.includes(initial.grade),
+  );
   const uid = useId();
   const photoInputId = `photo-form-${uid}`;
 
@@ -257,9 +277,30 @@ function DetailForm({
     fatherPhone: `${uid}-fatherPhone`,
     motherName: `${uid}-motherName`,
     grade: `${uid}-grade`,
+    gradeNew: `${uid}-gradeNew`,
     bloodGroup: `${uid}-bloodGroup`,
     address: `${uid}-address`,
   };
+
+  const handleGradeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === "__new__") {
+      setIsNewClass(true);
+      set("grade", "");
+    } else {
+      setIsNewClass(false);
+      set("grade", val);
+    }
+  };
+
+  // Determine the select value
+  const selectValue = isNewClass
+    ? "__new__"
+    : availableClasses.includes(form.grade)
+      ? form.grade
+      : form.grade === ""
+        ? ""
+        : "__new__";
 
   return (
     <motion.div
@@ -288,6 +329,19 @@ function DetailForm({
           }}
         >
           Student will be automatically added to the Fee Ledger
+        </div>
+      )}
+
+      {isEdit && (
+        <div
+          className="mb-4 px-3 py-2 rounded-sm text-xs"
+          style={{
+            background: "rgba(0,245,255,0.05)",
+            border: "1px solid rgba(0,245,255,0.15)",
+            color: "#00f5ff",
+          }}
+        >
+          Changes to name or class will automatically update the Fee Ledger
         </div>
       )}
 
@@ -331,7 +385,7 @@ function DetailForm({
           />
         </div>
 
-        {/* Text fields */}
+        {/* Text fields (grade excluded) */}
         {(
           [
             ["name", "Full Name", "text"],
@@ -339,7 +393,6 @@ function DetailForm({
             ["fatherName", "Father's Name", "text"],
             ["fatherPhone", "Father's Phone", "tel"],
             ["motherName", "Mother's Name", "text"],
-            ["grade", "Class / Grade", "text"],
           ] as [keyof typeof fieldIds & keyof typeof form, string, string][]
         ).map(([field, label, type]) => (
           <div key={field}>
@@ -359,6 +412,45 @@ function DetailForm({
             />
           </div>
         ))}
+
+        {/* Class / Grade dropdown */}
+        <div>
+          <label
+            htmlFor={fieldIds.grade}
+            className="block text-[10px] text-[#a0a0a0] tracking-widest uppercase mb-1"
+          >
+            Class / Grade
+          </label>
+          <select
+            id={fieldIds.grade}
+            data-ocid="details.grade.select"
+            className="hud-input w-full px-2.5 py-1.5 rounded-sm cursor-pointer"
+            value={selectValue}
+            onChange={handleGradeSelect}
+          >
+            <option value="" className="bg-[#141414]">
+              -- Select Class --
+            </option>
+            {availableClasses.map((cls) => (
+              <option key={cls} value={cls} className="bg-[#141414]">
+                {cls}
+              </option>
+            ))}
+            <option value="__new__" className="bg-[#141414]">
+              + Add New Class...
+            </option>
+          </select>
+          {isNewClass && (
+            <input
+              id={fieldIds.gradeNew}
+              type="text"
+              className="hud-input w-full px-2.5 py-1.5 rounded-sm mt-2"
+              value={form.grade}
+              placeholder="Type new class name (e.g. Class 5)"
+              onChange={(e) => set("grade", e.target.value)}
+            />
+          )}
+        </div>
 
         {/* Blood Group */}
         <div>
@@ -430,10 +522,17 @@ export default function DetailsTab({
   setDetails,
   students,
   setStudents,
+  onGoToFeeTab,
 }: Props) {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<StudentDetail | null>(null);
+
+  const availableClasses = useMemo(
+    () =>
+      Array.from(new Set(students.map((s) => s.grade).filter(Boolean))).sort(),
+    [students],
+  );
 
   const filtered = details.filter(
     (s) =>
@@ -461,9 +560,11 @@ export default function DetailsTab({
             classFee: 500,
             generatorCharge: 0,
             transportCharge: 0,
+            examCharge: 0,
             fees: {},
             generatorFees: {},
             transportFees: {},
+            examFees: {},
           };
           setStudents((prev) => [...prev, newStudent]);
         }
@@ -477,19 +578,88 @@ export default function DetailsTab({
   const handleEdit = useCallback(
     (data: Omit<StudentDetail, "id">) => {
       if (!editTarget) return;
+
+      // Save updated detail
       setDetails((prev) =>
         prev.map((s) => (s.id === editTarget.id ? { ...data, id: s.id } : s)),
       );
+
+      // Sync name and grade changes to the Fee Ledger
+      // Match fee ledger entry by old name + old grade
+      const oldName = editTarget.name.trim().toLowerCase();
+      const oldGrade = editTarget.grade;
+      const newName = data.name.trim();
+      const newGrade = data.grade;
+
+      if (oldName || oldGrade) {
+        setStudents((prev) => {
+          const matchIndex = prev.findIndex(
+            (s) =>
+              s.name.trim().toLowerCase() === oldName && s.grade === oldGrade,
+          );
+          if (matchIndex === -1) {
+            // No matching fee entry — create one if the student has a name
+            if (newName) {
+              const alreadyExists = prev.some(
+                (s) =>
+                  s.name.trim().toLowerCase() === newName.toLowerCase() &&
+                  s.grade === newGrade,
+              );
+              if (!alreadyExists) {
+                const newStudent: Student = {
+                  id: `fee_${editTarget.id}`,
+                  name: newName,
+                  grade: newGrade,
+                  classFee: 500,
+                  generatorCharge: 0,
+                  transportCharge: 0,
+                  examCharge: 0,
+                  fees: {},
+                  generatorFees: {},
+                  transportFees: {},
+                  examFees: {},
+                };
+                return [...prev, newStudent];
+              }
+            }
+            return prev;
+          }
+          // Update existing fee ledger entry with new name and grade
+          return prev.map((s, i) =>
+            i === matchIndex
+              ? { ...s, name: newName || s.name, grade: newGrade }
+              : s,
+          );
+        });
+      }
+
       setEditTarget(null);
     },
-    [editTarget, setDetails],
+    [editTarget, setDetails, setStudents],
   );
 
   const handleDelete = useCallback(
     (id: string) => {
+      // Find the detail being deleted so we can match and remove from fee ledger
+      const targetDetail = details.find((s) => s.id === id);
       setDetails((prev) => prev.filter((s) => s.id !== id));
+
+      // Remove matching entry from Fee Ledger
+      if (targetDetail?.name.trim()) {
+        const nameToRemove = targetDetail.name.trim().toLowerCase();
+        const gradeToRemove = targetDetail.grade;
+        setStudents((prev) =>
+          prev.filter(
+            (s) =>
+              !(
+                s.name.trim().toLowerCase() === nameToRemove &&
+                s.grade === gradeToRemove
+              ),
+          ),
+        );
+      }
     },
-    [setDetails],
+    [details, setDetails, setStudents],
   );
 
   const handlePhotoUpload = useCallback(
@@ -550,6 +720,7 @@ export default function DetailsTab({
             onSave={handleAdd}
             onCancel={() => setShowForm(false)}
             isEdit={false}
+            availableClasses={availableClasses}
           />
         )}
         {editTarget && (
@@ -559,6 +730,7 @@ export default function DetailsTab({
             onSave={handleEdit}
             onCancel={() => setEditTarget(null)}
             isEdit
+            availableClasses={availableClasses}
           />
         )}
       </AnimatePresence>
@@ -587,6 +759,7 @@ export default function DetailsTab({
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onPhotoUpload={handlePhotoUpload}
+                onGoToFeeTab={onGoToFeeTab}
               />
             ))}
           </AnimatePresence>
