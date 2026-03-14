@@ -52,20 +52,10 @@ function ReceiptModal({
   });
 
   // Months that are paid for each charge
-  const currentMonthIndex = new Date().getMonth(); // 0=Jan, 11=Dec
-  const activeMonths = MONTHS.slice(0, currentMonthIndex + 1);
-
   const paidTuitionMonths = MONTHS.filter((m) => student.fees[m]);
   const paidGenMonths = MONTHS.filter((m) => student.generatorFees[m]);
   const paidTransMonths = MONTHS.filter((m) => student.transportFees[m]);
   const paidExamMonths = MONTHS.filter((m) => student.examFees?.[m]);
-
-  const unpaidTuitionMonths = activeMonths.filter((m) => !student.fees[m]);
-  const unpaidGenMonths = activeMonths.filter((m) => !student.generatorFees[m]);
-  const unpaidTransMonths = activeMonths.filter(
-    (m) => !student.transportFees[m],
-  );
-  const unpaidExamMonths = activeMonths.filter((m) => !student.examFees?.[m]);
 
   const tuitionTotal = paidTuitionMonths.length * student.classFee;
   const genTotal = paidGenMonths.length * student.generatorCharge;
@@ -84,50 +74,22 @@ function ReceiptModal({
   const examPaid = paidExamMonths.length > 0;
 
   const unpaidCharges: string[] = [];
-  if (unpaidTuitionMonths.length > 0) {
-    if (!tuitionPaid) {
-      unpaidCharges.push(
-        `Tuition Fee — ${INR}${fmt(student.classFee)}/mo (no months paid)`,
-      );
-    } else {
-      unpaidCharges.push(
-        `Tuition Fee — Not paid for: ${unpaidTuitionMonths.join(", ")} (${INR}${fmt(student.classFee)}/mo each)`,
-      );
-    }
-  }
-  if (showGen && unpaidGenMonths.length > 0) {
-    if (!genPaid) {
-      unpaidCharges.push(
-        `Generator Charge — ${INR}${fmt(student.generatorCharge)}/mo (no months paid)`,
-      );
-    } else {
-      unpaidCharges.push(
-        `Generator Charge — Not paid for: ${unpaidGenMonths.join(", ")} (${INR}${fmt(student.generatorCharge)}/mo each)`,
-      );
-    }
-  }
-  if (showTrans && unpaidTransMonths.length > 0) {
-    if (!transPaid) {
-      unpaidCharges.push(
-        `Transport Charge — ${INR}${fmt(student.transportCharge)}/mo (no months paid)`,
-      );
-    } else {
-      unpaidCharges.push(
-        `Transport Charge — Not paid for: ${unpaidTransMonths.join(", ")} (${INR}${fmt(student.transportCharge)}/mo each)`,
-      );
-    }
-  }
-  if (showExam && unpaidExamMonths.length > 0) {
-    if (!examPaid) {
-      unpaidCharges.push(
-        `Examination Fee — ${INR}${fmt(student.examCharge ?? 0)}/sitting (no months paid)`,
-      );
-    } else {
-      unpaidCharges.push(
-        `Examination Fee — Not paid for: ${unpaidExamMonths.join(", ")} (${INR}${fmt(student.examCharge ?? 0)}/sitting each)`,
-      );
-    }
-  }
+  if (!tuitionPaid)
+    unpaidCharges.push(
+      `Tuition Fee — ${INR}${fmt(student.classFee)}/mo (not paid for any month)`,
+    );
+  if (showGen && !genPaid)
+    unpaidCharges.push(
+      `Generator Charge — ${INR}${fmt(student.generatorCharge)}/mo (not paid for any month)`,
+    );
+  if (showTrans && !transPaid)
+    unpaidCharges.push(
+      `Transport Charge — ${INR}${fmt(student.transportCharge)}/mo (not paid for any month)`,
+    );
+  if (showExam && !examPaid)
+    unpaidCharges.push(
+      `Examination Fee — ${INR}${fmt(student.examCharge ?? 0)}/sitting (not paid for any month)`,
+    );
 
   const allPaid = unpaidCharges.length === 0;
 
@@ -170,7 +132,6 @@ function ReceiptModal({
           .fees-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 13px; }
           .fees-table th { background: #000; color: #fff; padding: 6px 10px; text-align: left; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
           .fees-table td { padding: 6px 10px; border-bottom: 1px solid #eee; }
-          .fees-table td:first-child { background: #000 !important; color: #fff !important; font-weight: bold; }
           .fees-table tr:last-child td { border-bottom: none; }
           .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #000 !important; }
           .paid-badge { background: #e6f9f0; color: #006b3c; border: 1px solid #00c060; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
@@ -539,14 +500,7 @@ function ReceiptModal({
                       background: tuitionPaid ? "#fff" : "#fff8f8",
                     }}
                   >
-                    <td
-                      style={{
-                        padding: "8px 10px",
-                        background: "#000",
-                        color: "#fff",
-                        fontWeight: "bold",
-                      }}
-                    >
+                    <td style={{ padding: "8px 10px" }}>
                       Tuition Fee ({INR}
                       {fmt(student.classFee)}/mo)
                     </td>
@@ -554,22 +508,10 @@ function ReceiptModal({
                       style={{
                         padding: "8px 10px",
                         fontSize: "11px",
+                        color: "#555",
                       }}
                     >
-                      {paidTuitionMonths.length > 0 && (
-                        <div style={{ color: "#006b3c" }}>
-                          ✓ Paid: {paidTuitionMonths.join(", ")}
-                        </div>
-                      )}
-                      {unpaidTuitionMonths.length > 0 ? (
-                        <div style={{ color: "#cc0000" }}>
-                          ✗ Not Paid: {unpaidTuitionMonths.join(", ")}
-                        </div>
-                      ) : paidTuitionMonths.length > 0 ? (
-                        <div style={{ color: "#006b3c" }}>None unpaid</div>
-                      ) : (
-                        <div style={{ color: "#cc0000" }}>No months paid</div>
-                      )}
+                      {tuitionPaid ? paidTuitionMonths.join(", ") : "—"}
                     </td>
                     <td
                       style={{
@@ -593,14 +535,7 @@ function ReceiptModal({
                         background: genPaid ? "#fff" : "#fff8f8",
                       }}
                     >
-                      <td
-                        style={{
-                          padding: "8px 10px",
-                          background: "#000",
-                          color: "#fff",
-                          fontWeight: "bold",
-                        }}
-                      >
+                      <td style={{ padding: "8px 10px" }}>
                         Generator Charge ({INR}
                         {fmt(student.generatorCharge)}/mo)
                       </td>
@@ -608,22 +543,10 @@ function ReceiptModal({
                         style={{
                           padding: "8px 10px",
                           fontSize: "11px",
+                          color: "#555",
                         }}
                       >
-                        {paidGenMonths.length > 0 && (
-                          <div style={{ color: "#006b3c" }}>
-                            ✓ Paid: {paidGenMonths.join(", ")}
-                          </div>
-                        )}
-                        {unpaidGenMonths.length > 0 ? (
-                          <div style={{ color: "#cc0000" }}>
-                            ✗ Not Paid: {unpaidGenMonths.join(", ")}
-                          </div>
-                        ) : paidGenMonths.length > 0 ? (
-                          <div style={{ color: "#006b3c" }}>None unpaid</div>
-                        ) : (
-                          <div style={{ color: "#cc0000" }}>No months paid</div>
-                        )}
+                        {genPaid ? paidGenMonths.join(", ") : "—"}
                       </td>
                       <td
                         style={{
@@ -648,14 +571,7 @@ function ReceiptModal({
                         background: transPaid ? "#fff" : "#fff8f8",
                       }}
                     >
-                      <td
-                        style={{
-                          padding: "8px 10px",
-                          background: "#000",
-                          color: "#fff",
-                          fontWeight: "bold",
-                        }}
-                      >
+                      <td style={{ padding: "8px 10px" }}>
                         Transport Charge ({INR}
                         {fmt(student.transportCharge)}/mo)
                       </td>
@@ -663,22 +579,10 @@ function ReceiptModal({
                         style={{
                           padding: "8px 10px",
                           fontSize: "11px",
+                          color: "#555",
                         }}
                       >
-                        {paidTransMonths.length > 0 && (
-                          <div style={{ color: "#006b3c" }}>
-                            ✓ Paid: {paidTransMonths.join(", ")}
-                          </div>
-                        )}
-                        {unpaidTransMonths.length > 0 ? (
-                          <div style={{ color: "#cc0000" }}>
-                            ✗ Not Paid: {unpaidTransMonths.join(", ")}
-                          </div>
-                        ) : paidTransMonths.length > 0 ? (
-                          <div style={{ color: "#006b3c" }}>None unpaid</div>
-                        ) : (
-                          <div style={{ color: "#cc0000" }}>No months paid</div>
-                        )}
+                        {transPaid ? paidTransMonths.join(", ") : "—"}
                       </td>
                       <td
                         style={{
@@ -703,14 +607,7 @@ function ReceiptModal({
                         background: examPaid ? "#fff" : "#fff8f8",
                       }}
                     >
-                      <td
-                        style={{
-                          padding: "8px 10px",
-                          background: "#000",
-                          color: "#fff",
-                          fontWeight: "bold",
-                        }}
-                      >
+                      <td style={{ padding: "8px 10px" }}>
                         Examination Fee ({INR}
                         {fmt(student.examCharge ?? 0)}/sitting)
                       </td>
@@ -718,22 +615,10 @@ function ReceiptModal({
                         style={{
                           padding: "8px 10px",
                           fontSize: "11px",
+                          color: "#555",
                         }}
                       >
-                        {paidExamMonths.length > 0 && (
-                          <div style={{ color: "#006b3c" }}>
-                            ✓ Paid: {paidExamMonths.join(", ")}
-                          </div>
-                        )}
-                        {unpaidExamMonths.length > 0 ? (
-                          <div style={{ color: "#cc0000" }}>
-                            ✗ Not Paid: {unpaidExamMonths.join(", ")}
-                          </div>
-                        ) : paidExamMonths.length > 0 ? (
-                          <div style={{ color: "#006b3c" }}>None unpaid</div>
-                        ) : (
-                          <div style={{ color: "#cc0000" }}>No months paid</div>
-                        )}
+                        {examPaid ? paidExamMonths.join(", ") : "—"}
                       </td>
                       <td
                         style={{
