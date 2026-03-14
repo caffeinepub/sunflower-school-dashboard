@@ -334,7 +334,7 @@ function Dashboard() {
           const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           if (attendance[key]?.[s.id] === "present") present++;
         }
-        if (present === 0) return s; // keep manual value if no attendance data yet
+        if (present === 0) return s;
         return { ...s, daysPresent: present };
       }),
     );
@@ -342,8 +342,6 @@ function Dashboard() {
   // ────────────────────────────────────────────────────────────────────────────
 
   // ── Auto daily backup ────────────────────────────────────────────────────────
-  // Reads directly from localStorage (already synced by the effects above)
-  // so this effect is intentionally dependency-free and runs once on mount.
   useEffect(() => {
     const timer = setTimeout(() => {
       const today = getTodayDateStr();
@@ -599,7 +597,11 @@ function Dashboard() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.18 }}
             >
-              <FeeTab students={students} setStudents={setStudents} />
+              <FeeTab
+                students={students}
+                setStudents={setStudents}
+                studentDetails={studentDetails}
+              />
             </motion.div>
           )}
           {activeTab === "details" && (
@@ -613,6 +615,8 @@ function Dashboard() {
               <DetailsTab
                 details={studentDetails}
                 setDetails={setStudentDetails}
+                students={students}
+                setStudents={setStudents}
               />
             </motion.div>
           )}

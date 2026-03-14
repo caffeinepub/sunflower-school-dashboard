@@ -10,11 +10,18 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useId, useRef, useState } from "react";
-import { BLOOD_GROUPS, type BloodGroup, type StudentDetail } from "../types";
+import {
+  BLOOD_GROUPS,
+  type BloodGroup,
+  type Student,
+  type StudentDetail,
+} from "../types";
 
 interface Props {
   details: StudentDetail[];
   setDetails: React.Dispatch<React.SetStateAction<StudentDetail[]>>;
+  students: Student[];
+  setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
 }
 
 const EMPTY_FORM: Omit<StudentDetail, "id"> = {
@@ -110,7 +117,6 @@ function StudentCard({
 
       {/* Photo + name row */}
       <div className="flex items-center gap-3">
-        {/* Avatar — use label wrapping input for accessible file pick */}
         <div className="relative shrink-0">
           <label
             htmlFor={fileInputId}
@@ -128,7 +134,6 @@ function StudentCard({
               <UserCircleIcon className="w-10 h-10 text-[#a0a0a0]" />
             )}
           </label>
-          {/* Camera badge — also a label for the same input */}
           <label
             htmlFor={fileInputId}
             data-ocid={`details.photo_upload.${ocidIdx}`}
@@ -146,7 +151,6 @@ function StudentCard({
           />
         </div>
 
-        {/* Name + grade */}
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white truncate leading-tight">
             {student.name || (
@@ -273,6 +277,19 @@ function DetailForm({
         />
         {isEdit ? "Edit Student" : "Add New Student"}
       </h3>
+
+      {!isEdit && (
+        <div
+          className="mb-4 px-3 py-2 rounded-sm text-xs"
+          style={{
+            background: "rgba(0,245,255,0.05)",
+            border: "1px solid rgba(0,245,255,0.15)",
+            color: "#00f5ff",
+          }}
+        >
+          Student will be automatically added to the Fee Ledger
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         {/* Photo upload */}
@@ -408,7 +425,12 @@ function DetailForm({
   );
 }
 
-export default function DetailsTab({ details, setDetails }: Props) {
+export default function DetailsTab({
+  details,
+  setDetails,
+  students,
+  setStudents,
+}: Props) {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<StudentDetail | null>(null);
@@ -421,10 +443,35 @@ export default function DetailsTab({ details, setDetails }: Props) {
 
   const handleAdd = useCallback(
     (data: Omit<StudentDetail, "id">) => {
-      setDetails((prev) => [...prev, { ...data, id: Date.now().toString() }]);
+      const newId = Date.now().toString();
+      setDetails((prev) => [...prev, { ...data, id: newId }]);
+
+      // Auto-add to fee ledger if student name is not already there
+      if (data.name.trim()) {
+        const alreadyInLedger = students.some(
+          (s) =>
+            s.name.trim().toLowerCase() === data.name.trim().toLowerCase() &&
+            s.grade === data.grade,
+        );
+        if (!alreadyInLedger) {
+          const newStudent: Student = {
+            id: `fee_${newId}`,
+            name: data.name.trim(),
+            grade: data.grade,
+            classFee: 500,
+            generatorCharge: 0,
+            transportCharge: 0,
+            fees: {},
+            generatorFees: {},
+            transportFees: {},
+          };
+          setStudents((prev) => [...prev, newStudent]);
+        }
+      }
+
       setShowForm(false);
     },
-    [setDetails],
+    [setDetails, setStudents, students],
   );
 
   const handleEdit = useCallback(
@@ -459,7 +506,6 @@ export default function DetailsTab({ details, setDetails }: Props) {
     setShowForm(false);
   }, []);
 
-  // unused ref suppression — fileRef was removed in favour of label/input pattern
   const _unused = useRef(null);
   void _unused;
 

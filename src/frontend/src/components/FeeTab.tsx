@@ -4,31 +4,567 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   PlusIcon,
+  PrinterIcon,
   SearchIcon,
   Trash2Icon,
   TruckIcon,
   UsersIcon,
+  XIcon,
   ZapIcon,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { INR, MONTHS, type Month, type Student, fmt } from "../types";
+import {
+  INR,
+  MONTHS,
+  type Month,
+  type Student,
+  type StudentDetail,
+  fmt,
+} from "../types";
 
 interface Props {
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
+  studentDetails: StudentDetail[];
 }
 
 const currentMonthName = new Date().toLocaleString("default", {
   month: "short",
 }) as Month;
 
-export default function FeeTab({ students, setStudents }: Props) {
+// ── Receipt Modal ─────────────────────────────────────────────────────────────
+function ReceiptModal({
+  student,
+  detail,
+  onClose,
+}: {
+  student: Student;
+  detail: StudentDetail | undefined;
+  onClose: () => void;
+}) {
+  const receiptNo = `RCP-${student.id.slice(-4).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+  const today = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  // Months that are paid for tuition
+  const paidTuitionMonths = MONTHS.filter((m) => student.fees[m]);
+  const paidGenMonths = MONTHS.filter((m) => student.generatorFees[m]);
+  const paidTransMonths = MONTHS.filter((m) => student.transportFees[m]);
+
+  const tuitionTotal = paidTuitionMonths.length * student.classFee;
+  const genTotal = paidGenMonths.length * student.generatorCharge;
+  const transTotal = paidTransMonths.length * student.transportCharge;
+  const grandTotal = tuitionTotal + genTotal + transTotal;
+
+  const handlePrint = () => {
+    const printContents =
+      document.getElementById("fee-receipt-print")?.innerHTML;
+    if (!printContents) return;
+
+    // Use a hidden iframe to avoid popup blockers
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
+
+    doc.open();
+    doc.write(`<!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fee Receipt - ${student.name}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; background: #fff; color: #000; padding: 20px; }
+          .receipt { max-width: 560px; margin: 0 auto; border: 2px solid #000; padding: 24px; }
+          .school-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
+          .school-name { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+          .school-sub { font-size: 12px; color: #444; margin-top: 4px; }
+          .receipt-title { text-align: center; font-size: 16px; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; background: #000; color: #fff; padding: 6px; }
+          .meta-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; }
+          .student-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 16px; font-size: 13px; }
+          .student-box .label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+          .student-box .value { font-weight: bold; }
+          .fees-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+          .fees-table th { background: #000; color: #fff; padding: 6px 10px; text-align: left; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+          .fees-table td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+          .fees-table tr:last-child td { border-bottom: none; }
+          .months-list { font-size: 11px; color: #555; }
+          .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #000 !important; }
+          .footer { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 16px; border-top: 1px solid #ccc; font-size: 12px; }
+          .sig-line { border-top: 1px solid #000; width: 140px; text-align: center; padding-top: 4px; margin-top: 24px; font-size: 11px; color: #555; }
+          .watermark { text-align: center; margin-top: 12px; font-size: 10px; color: #aaa; letter-spacing: 2px; }
+        </style>
+      </head>
+      <body>${printContents}</body>
+      </html>`);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 400);
+  };
+
+  return (
+    <div
+      data-ocid="fee.receipt_modal"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.85)" }}
+    >
+      <div
+        className="w-full max-w-lg glass-card rounded-sm overflow-hidden"
+        style={{
+          borderColor: "rgba(0,245,255,0.2)",
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <h2 className="text-sm font-bold text-[#00f5ff] tracking-widest uppercase flex items-center gap-2">
+            <PrinterIcon className="w-4 h-4" />
+            Fee Receipt
+          </h2>
+          <button
+            type="button"
+            data-ocid="fee.receipt_modal.close_button"
+            onClick={onClose}
+            className="p-1.5 rounded-sm text-[#a0a0a0] hover:text-white hover:bg-white/10 transition-all"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Receipt preview */}
+        <div className="p-5">
+          <div id="fee-receipt-print">
+            <div
+              className="receipt"
+              style={{
+                fontFamily: "Arial, sans-serif",
+                border: "2px solid #ddd",
+                padding: "24px",
+                background: "#fff",
+                color: "#000",
+              }}
+            >
+              {/* School Header */}
+              <div
+                style={{
+                  textAlign: "center",
+                  borderBottom: "2px solid #000",
+                  paddingBottom: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 900,
+                    letterSpacing: "2px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  SUNFLOWER PUBLIC SCHOOL
+                </div>
+                <div
+                  style={{ fontSize: "12px", color: "#555", marginTop: "4px" }}
+                >
+                  Director: Kausar Parween
+                </div>
+              </div>
+
+              {/* Receipt Title */}
+              <div
+                style={{
+                  textAlign: "center",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  letterSpacing: "3px",
+                  textTransform: "uppercase",
+                  background: "#000",
+                  color: "#fff",
+                  padding: "6px",
+                  marginBottom: "16px",
+                }}
+              >
+                FEE RECEIPT
+              </div>
+
+              {/* Meta */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  marginBottom: "12px",
+                }}
+              >
+                <span>
+                  <strong>Receipt No:</strong> {receiptNo}
+                </span>
+                <span>
+                  <strong>Date:</strong> {today}
+                </span>
+              </div>
+
+              {/* Student Info */}
+              <div
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "10px",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "8px",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#555",
+                        textTransform: "uppercase",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Student Name
+                    </div>
+                    <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#555",
+                        textTransform: "uppercase",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Class
+                    </div>
+                    <div style={{ fontWeight: "bold" }}>{student.grade}</div>
+                  </div>
+                  {detail?.fatherName && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#555",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                        }}
+                      >
+                        Father's Name
+                      </div>
+                      <div style={{ fontWeight: "bold" }}>
+                        {detail.fatherName}
+                      </div>
+                    </div>
+                  )}
+                  {detail?.fatherPhone && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#555",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                        }}
+                      >
+                        Father's Phone
+                      </div>
+                      <div style={{ fontWeight: "bold" }}>
+                        {detail.fatherPhone}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Fees Table */}
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#000", color: "#fff" }}>
+                    <th
+                      style={{
+                        padding: "6px 10px",
+                        textAlign: "left",
+                        fontSize: "11px",
+                        letterSpacing: "1px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Description
+                    </th>
+                    <th
+                      style={{
+                        padding: "6px 10px",
+                        textAlign: "left",
+                        fontSize: "11px",
+                        letterSpacing: "1px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Months
+                    </th>
+                    <th
+                      style={{
+                        padding: "6px 10px",
+                        textAlign: "right",
+                        fontSize: "11px",
+                        letterSpacing: "1px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paidTuitionMonths.length > 0 && (
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "8px 10px" }}>
+                        Tuition Fee ({INR}
+                        {fmt(student.classFee)}/mo)
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          fontSize: "11px",
+                          color: "#555",
+                        }}
+                      >
+                        {paidTuitionMonths.join(", ")}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {INR} {fmt(tuitionTotal)}
+                      </td>
+                    </tr>
+                  )}
+                  {paidGenMonths.length > 0 && (
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "8px 10px" }}>
+                        Generator Charge ({INR}
+                        {fmt(student.generatorCharge)}/mo)
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          fontSize: "11px",
+                          color: "#555",
+                        }}
+                      >
+                        {paidGenMonths.join(", ")}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {INR} {fmt(genTotal)}
+                      </td>
+                    </tr>
+                  )}
+                  {paidTransMonths.length > 0 && (
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "8px 10px" }}>
+                        Transport Charge ({INR}
+                        {fmt(student.transportCharge)}/mo)
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          fontSize: "11px",
+                          color: "#555",
+                        }}
+                      >
+                        {paidTransMonths.join(", ")}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          textAlign: "right",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {INR} {fmt(transTotal)}
+                      </td>
+                    </tr>
+                  )}
+                  {paidTuitionMonths.length === 0 &&
+                    paidGenMonths.length === 0 &&
+                    paidTransMonths.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={3}
+                          style={{
+                            padding: "12px 10px",
+                            textAlign: "center",
+                            color: "#999",
+                            fontSize: "12px",
+                          }}
+                        >
+                          No fees marked as paid yet
+                        </td>
+                      </tr>
+                    )}
+                  <tr style={{ borderTop: "2px solid #000" }}>
+                    <td
+                      colSpan={2}
+                      style={{
+                        padding: "10px 10px",
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                      }}
+                    >
+                      GRAND TOTAL
+                    </td>
+                    <td
+                      style={{
+                        padding: "10px 10px",
+                        textAlign: "right",
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                      }}
+                    >
+                      {INR} {fmt(grandTotal)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Footer */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: "24px",
+                  paddingTop: "16px",
+                  borderTop: "1px solid #ccc",
+                  fontSize: "12px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      borderTop: "1px solid #000",
+                      width: "140px",
+                      paddingTop: "4px",
+                      marginTop: "32px",
+                      fontSize: "11px",
+                      color: "#555",
+                      textAlign: "center",
+                    }}
+                  >
+                    Parent / Guardian Signature
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div
+                    style={{
+                      borderTop: "1px solid #000",
+                      width: "140px",
+                      paddingTop: "4px",
+                      marginTop: "32px",
+                      fontSize: "11px",
+                      color: "#555",
+                      textAlign: "center",
+                    }}
+                  >
+                    Authorized Signature
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: "12px",
+                  fontSize: "10px",
+                  color: "#aaa",
+                  letterSpacing: "2px",
+                }}
+              >
+                SUNFLOWER PUBLIC SCHOOL · OFFICIAL FEE RECEIPT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Print Button */}
+        <div className="px-5 pb-5 flex justify-end gap-2">
+          <button
+            type="button"
+            data-ocid="fee.receipt_modal.cancel_button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-sm bg-white/5 border border-white/10 text-[#a0a0a0] hover:text-white hover:bg-white/10 transition-all"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            data-ocid="fee.receipt_modal.print_button"
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-bold rounded-sm bg-[#00f5ff]/20 border border-[#00f5ff]/50 text-[#00f5ff] hover:bg-[#00f5ff]/30 transition-all"
+            style={{ boxShadow: "0 0 12px rgba(0,245,255,0.2)" }}
+          >
+            <PrinterIcon className="w-4 h-4" />
+            Print Receipt
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function FeeTab({
+  students,
+  setStudents,
+  studentDetails,
+}: Props) {
   const [search, setSearch] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set(),
   );
   const [newClassInput, setNewClassInput] = useState("");
   const [showNewClassInput, setShowNewClassInput] = useState(false);
+  const [receiptStudent, setReceiptStudent] = useState<Student | null>(null);
 
   const filtered = students.filter(
     (s) =>
@@ -151,11 +687,27 @@ export default function FeeTab({ students, setStudents }: Props) {
     return total;
   };
 
-  // All students in display order for deterministic index
   const allDisplayedStudents = groups.flatMap(([, ss]) => ss);
+
+  // Find matching detail record for receipt
+  const getDetail = (s: Student) =>
+    studentDetails.find(
+      (d) =>
+        d.name.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+        d.grade === s.grade,
+    );
 
   return (
     <div className="space-y-6">
+      {/* Receipt Modal */}
+      {receiptStudent && (
+        <ReceiptModal
+          student={receiptStudent}
+          detail={getDetail(receiptStudent)}
+          onClose={() => setReceiptStudent(null)}
+        />
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glass-card rounded-sm p-4 flex items-center gap-4">
@@ -340,6 +892,7 @@ export default function FeeTab({ students, setStudents }: Props) {
                         onUpdate={updateStudent}
                         onDelete={deleteStudent}
                         totalPaid={studentTotalPaid(student)}
+                        onPrintReceipt={() => setReceiptStudent(student)}
                       />
                     );
                   })}
@@ -379,6 +932,7 @@ interface RowProps {
   ) => void;
   onDelete: (id: string) => void;
   totalPaid: number;
+  onPrintReceipt: () => void;
 }
 
 function StudentRow({
@@ -388,6 +942,7 @@ function StudentRow({
   onUpdate,
   onDelete,
   totalPaid,
+  onPrintReceipt,
 }: RowProps) {
   return (
     <div data-ocid={`fee.row.${index}`} className="px-4 py-3 space-y-3">
@@ -429,9 +984,7 @@ function StudentRow({
           </span>
           <input
             type="number"
-            className={`hud-input w-20 px-2 py-1 rounded-sm text-xs ${
-              student.generatorCharge === 0 ? "opacity-40" : ""
-            }`}
+            className={`hud-input w-20 px-2 py-1 rounded-sm text-xs ${student.generatorCharge === 0 ? "opacity-40" : ""}`}
             value={student.generatorCharge}
             onChange={(e) =>
               onUpdate(student.id, "generatorCharge", Number(e.target.value))
@@ -449,22 +1002,31 @@ function StudentRow({
           </span>
           <input
             type="number"
-            className={`hud-input w-20 px-2 py-1 rounded-sm text-xs ${
-              student.transportCharge === 0 ? "opacity-40" : ""
-            }`}
+            className={`hud-input w-20 px-2 py-1 rounded-sm text-xs ${student.transportCharge === 0 ? "opacity-40" : ""}`}
             value={student.transportCharge}
             onChange={(e) =>
               onUpdate(student.id, "transportCharge", Number(e.target.value))
             }
           />
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
           <div className="text-right">
             <p className="text-xs text-[#a0a0a0] font-mono">Total Paid</p>
             <p className="text-sm font-bold font-mono text-[#00ff88]">
               {INR} {fmt(totalPaid)}
             </p>
           </div>
+          {/* Print Receipt button */}
+          <button
+            type="button"
+            data-ocid={`fee.print_receipt_button.${index}`}
+            onClick={onPrintReceipt}
+            title="Print Fee Receipt"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs bg-[#0066ff]/15 border border-[#0066ff]/30 text-[#6699ff] hover:bg-[#0066ff]/25 hover:text-white transition-all"
+          >
+            <PrinterIcon className="w-3.5 h-3.5" />
+            Receipt
+          </button>
           <button
             type="button"
             data-ocid={`fee.delete_button.${index}`}
@@ -497,7 +1059,7 @@ function StudentRow({
         })}
       </div>
 
-      {/* Row 3: Generator toggles (only if applicable) */}
+      {/* Row 3: Generator toggles */}
       {student.generatorCharge > 0 && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-xs text-amber-400 w-16 shrink-0">
@@ -524,7 +1086,7 @@ function StudentRow({
         </div>
       )}
 
-      {/* Row 4: Transport toggles (only if applicable) */}
+      {/* Row 4: Transport toggles */}
       {student.transportCharge > 0 && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-xs text-blue-400 w-16 shrink-0">
