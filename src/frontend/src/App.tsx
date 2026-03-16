@@ -22,6 +22,7 @@ import SalaryTab from "./components/SalaryTab";
 import type {
   AttendanceRecord,
   MiscCharge,
+  ReportingTimesRecord,
   Staff,
   Student,
   StudentDetail,
@@ -298,7 +299,6 @@ function Dashboard() {
   );
   const [students, setStudents] = useState<Student[]>(() => {
     const raw = loadLS<Student[]>("sunflower_students", defaultStudents);
-    // Migrate: add examCharge/examFees for older data that lacks them
     return raw.map((s) => ({
       ...s,
       examCharge: s.examCharge ?? 0,
@@ -313,6 +313,9 @@ function Dashboard() {
   );
   const [attendance, setAttendance] = useState<AttendanceRecord>(() =>
     loadLS("sunflower_attendance", {}),
+  );
+  const [reportingTimes, setReportingTimes] = useState<ReportingTimesRecord>(
+    () => loadLS("sunflower_reporting_times", {}),
   );
   const [lastBackupDate, setLastBackupDate] = useState<string>(
     () => localStorage.getItem("sunflower_last_backup_date") ?? "",
@@ -339,12 +342,18 @@ function Dashboard() {
   useEffect(() => {
     localStorage.setItem("sunflower_attendance", JSON.stringify(attendance));
   }, [attendance]);
+  useEffect(() => {
+    localStorage.setItem(
+      "sunflower_reporting_times",
+      JSON.stringify(reportingTimes),
+    );
+  }, [reportingTimes]);
 
-  // ── Auto-sync attendance → daysPresent in Salary tab ────────────────────────
+  // Auto-sync attendance → daysPresent in Salary tab
   useEffect(() => {
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth(); // 0-based
+    const month = now.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     setStaff((prev) =>
       prev.map((s) => {
@@ -358,9 +367,8 @@ function Dashboard() {
       }),
     );
   }, [attendance]);
-  // ────────────────────────────────────────────────────────────────────────────
 
-  // ── Auto daily backup ────────────────────────────────────────────────────────
+  // Auto daily backup
   useEffect(() => {
     const timer = setTimeout(() => {
       const today = getTodayDateStr();
@@ -375,6 +383,7 @@ function Dashboard() {
           defaultStudentDetails,
         ),
         attendance: loadLS("sunflower_attendance", {}),
+        reportingTimes: loadLS("sunflower_reporting_times", {}),
         exportedAt: new Date().toISOString(),
       };
 
@@ -395,7 +404,6 @@ function Dashboard() {
 
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // ────────────────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(() => {
     toast.success("Generating PDF...", { duration: 1500 });
@@ -410,6 +418,7 @@ function Dashboard() {
       misc,
       studentDetails,
       attendance,
+      reportingTimes,
       exportedAt: new Date().toISOString(),
     };
     triggerDownload(
@@ -420,7 +429,7 @@ function Dashboard() {
       description: `Saved as sunflower_backup_${date}.json`,
       duration: 3000,
     });
-  }, [staff, students, misc, studentDetails, attendance]);
+  }, [staff, students, misc, studentDetails, attendance, reportingTimes]);
 
   const handleImportBackup = useCallback(() => {
     importFileRef.current?.click();
@@ -439,6 +448,7 @@ function Dashboard() {
           if (data.misc) setMisc(data.misc);
           if (data.studentDetails) setStudentDetails(data.studentDetails);
           if (data.attendance) setAttendance(data.attendance);
+          if (data.reportingTimes) setReportingTimes(data.reportingTimes);
           toast.success("Backup restored successfully!", {
             description: "All data has been loaded. Reloading page...",
             duration: 2500,
@@ -535,7 +545,6 @@ function Dashboard() {
 
             {/* Action buttons */}
             <div className="shrink-0 flex items-center gap-2">
-              {/* Lock button */}
               <button
                 type="button"
                 data-ocid="header.lock_button"
@@ -549,7 +558,6 @@ function Dashboard() {
                 </span>
               </button>
 
-              {/* Export Backup button */}
               <button
                 type="button"
                 data-ocid="header.backup_export_button"
@@ -564,7 +572,6 @@ function Dashboard() {
                 </span>
               </button>
 
-              {/* Import Backup button */}
               <button
                 type="button"
                 onClick={handleImportBackup}
@@ -578,7 +585,6 @@ function Dashboard() {
                 </span>
               </button>
 
-              {/* Export PDF button */}
               <button
                 type="button"
                 data-ocid="header.export_button"
@@ -667,6 +673,8 @@ function Dashboard() {
                 staff={staff}
                 attendance={attendance}
                 setAttendance={setAttendance}
+                reportingTimes={reportingTimes}
+                setReportingTimes={setReportingTimes}
               />
             </motion.div>
           )}
@@ -685,7 +693,6 @@ function Dashboard() {
               <span>SUNFLOWER SCHOOL MANAGEMENT SYSTEM v1.0</span>
             </div>
 
-            {/* Last auto-backup indicator */}
             <div
               data-ocid="footer.last_backup_info"
               className="flex items-center gap-1.5 text-xs"

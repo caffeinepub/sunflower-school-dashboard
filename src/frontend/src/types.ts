@@ -109,6 +109,14 @@ export type AttendanceStatus = "present" | "absent" | "leave";
 export type DailyAttendance = Record<string, AttendanceStatus>; // staffId -> status
 export type AttendanceRecord = Record<string, DailyAttendance>; // dateKey -> DailyAttendance
 
+/**
+ * Reporting time record.
+ * Key: ISO date string "YYYY-MM-DD"
+ * Value: Record<staffId, timeString ("HH:MM")>
+ */
+export type DailyReportingTimes = Record<string, string>; // staffId -> "HH:MM"
+export type ReportingTimesRecord = Record<string, DailyReportingTimes>; // dateKey -> DailyReportingTimes
+
 export function calcFinalSalary(staff: Staff): number {
   if (staff.totalDays === 0) return 0;
   return (staff.baseSalary / staff.totalDays) * staff.daysPresent;

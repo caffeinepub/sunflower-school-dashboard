@@ -6,19 +6,30 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   ClockIcon,
+  TimerIcon,
   UsersIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
-import type { AttendanceRecord, AttendanceStatus, Staff } from "../types";
+import type {
+  AttendanceRecord,
+  AttendanceStatus,
+  ReportingTimesRecord,
+  Staff,
+} from "../types";
 
 interface Props {
   staff: Staff[];
   attendance: AttendanceRecord;
   setAttendance: React.Dispatch<React.SetStateAction<AttendanceRecord>>;
+  reportingTimes: ReportingTimesRecord;
+  setReportingTimes: React.Dispatch<React.SetStateAction<ReportingTimesRecord>>;
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// School standard arrival time (09:00)
+const STANDARD_TIME = "09:00";
 
 function formatDateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -27,6 +38,19 @@ function formatDateKey(year: number, month: number, day: number): string {
 function getTodayKey(): string {
   const t = new Date();
   return formatDateKey(t.getFullYear(), t.getMonth(), t.getDate());
+}
+
+function isLate(time: string): boolean {
+  if (!time) return false;
+  return time > STANDARD_TIME;
+}
+
+function formatTime12h(time: string): string {
+  if (!time) return "—";
+  const [h, m] = time.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
 const STATUS_CONFIG = {
@@ -75,6 +99,8 @@ export default function AttendanceTab({
   staff,
   attendance,
   setAttendance,
+  reportingTimes,
+  setReportingTimes,
 }: Props) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -83,6 +109,7 @@ export default function AttendanceTab({
     today.getDate(),
   );
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [timingOpen, setTimingOpen] = useState(true);
 
   const todayKey = getTodayKey();
   const todayAttendance = attendance[todayKey];
@@ -94,13 +121,11 @@ export default function AttendanceTab({
   // Build calendar grid
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
-  // Convert Sunday=0 to Monday=0 offset
   const startOffset = (firstDayOfMonth + 6) % 7;
 
   const calendarCells: (number | null)[] = [];
   for (let i = 0; i < startOffset; i++) calendarCells.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
-  // Pad to full weeks
   while (calendarCells.length % 7 !== 0) calendarCells.push(null);
 
   const monthName = new Date(viewYear, viewMonth, 1).toLocaleString("default", {
@@ -165,6 +190,14 @@ export default function AttendanceTab({
     setAttendance((prev) => ({ ...prev, [key]: daily }));
   }
 
+  function setReportingTime(staffId: string, day: number, time: string) {
+    const key = getDateKey(day);
+    setReportingTimes((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] ?? {}), [staffId]: time },
+    }));
+  }
+
   // Monthly summary
   // biome-ignore lint/correctness/useExhaustiveDependencies: isSunday is stable given viewYear/viewMonth in deps
   const summary = useMemo(() => {
@@ -194,6 +227,9 @@ export default function AttendanceTab({
   const selectedDailyAttendance = selectedDateKey
     ? (attendance[selectedDateKey] ?? {})
     : {};
+  const selectedDailyTimes = selectedDateKey
+    ? (reportingTimes[selectedDateKey] ?? {})
+    : {};
 
   const panelStats = selectedDay
     ? {
@@ -217,6 +253,17 @@ export default function AttendanceTab({
     : "";
 
   const selectedFuture = selectedDay ? isFutureDate(selectedDay) : false;
+
+  // Reporting timing for selected day -- late count
+  const lateCount = selectedDay
+    ? staff.filter((s) => isLate(selectedDailyTimes[s.id] ?? "")).length
+    : 0;
+  const onTimeCount = selectedDay
+    ? staff.filter((s) => {
+        const t = selectedDailyTimes[s.id];
+        return t && !isLate(t);
+      }).length
+    : 0;
 
   return (
     <div className="space-y-4">
@@ -667,6 +714,249 @@ export default function AttendanceTab({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Teacher Reporting Timing Section ─────────────────────────────────── */}
+      <div className="glass-card rounded-sm">
+        <button
+          type="button"
+          data-ocid="attendance.timing_section_toggle"
+          onClick={() => setTimingOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 transition-all"
+          style={{
+            borderBottom: timingOpen
+              ? "1px solid rgba(255,255,255,0.08)"
+              : "none",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <TimerIcon className="w-4 h-4" style={{ color: "#f59e0b" }} />
+            <span
+              className="text-sm font-medium tracking-wide"
+              style={{ color: "white" }}
+            >
+              Teacher Reporting Timing
+            </span>
+            {selectedDay && !selectedFuture && (
+              <span
+                className="text-xs font-mono px-2 py-0.5 rounded-sm"
+                style={{
+                  background: "rgba(245,158,11,0.12)",
+                  border: "1px solid rgba(245,158,11,0.3)",
+                  color: "#f59e0b",
+                }}
+              >
+                {selectedDayLabel}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {selectedDay && !selectedFuture && staff.length > 0 && (
+              <div className="flex items-center gap-2 text-xs font-mono">
+                {onTimeCount > 0 && (
+                  <span style={{ color: "#00ff88" }}>
+                    {onTimeCount} On Time
+                  </span>
+                )}
+                {lateCount > 0 && (
+                  <span style={{ color: "#ff4444" }}>{lateCount} Late</span>
+                )}
+              </div>
+            )}
+            {timingOpen ? (
+              <ChevronUpIcon className="w-4 h-4" style={{ color: "#a0a0a0" }} />
+            ) : (
+              <ChevronDownIcon
+                className="w-4 h-4"
+                style={{ color: "#a0a0a0" }}
+              />
+            )}
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {timingOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="p-4 space-y-4">
+                {/* Info bar */}
+                <div
+                  className="flex items-center gap-2 p-3 rounded-sm text-xs"
+                  style={{
+                    background: "rgba(245,158,11,0.06)",
+                    border: "1px solid rgba(245,158,11,0.15)",
+                    color: "#a0a0a0",
+                  }}
+                >
+                  <ClockIcon
+                    className="w-3.5 h-3.5 shrink-0"
+                    style={{ color: "#f59e0b" }}
+                  />
+                  <span>
+                    Standard reporting time:{" "}
+                    <span
+                      className="font-mono font-semibold"
+                      style={{ color: "#f59e0b" }}
+                    >
+                      09:00 AM
+                    </span>
+                    . Arrivals after 9:00 AM are marked as{" "}
+                    <span style={{ color: "#ff4444" }}>Late</span>.
+                  </span>
+                </div>
+
+                {!selectedDay ? (
+                  <p
+                    className="text-xs text-center py-4"
+                    style={{ color: "#a0a0a0" }}
+                  >
+                    Select a day on the calendar above to log reporting times.
+                  </p>
+                ) : selectedFuture ? (
+                  <p
+                    className="text-xs text-center py-4"
+                    style={{ color: "#a0a0a0" }}
+                  >
+                    Future date — cannot log reporting times.
+                  </p>
+                ) : staff.length === 0 ? (
+                  <p
+                    className="text-xs text-center py-4"
+                    style={{ color: "#a0a0a0" }}
+                  >
+                    No staff added yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table
+                      data-ocid="attendance.reporting_timing_table"
+                      className="w-full text-sm border-collapse"
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            borderBottom: "1px solid rgba(255,255,255,0.08)",
+                          }}
+                        >
+                          {[
+                            "#",
+                            "Teacher",
+                            "Designation",
+                            "Arrival Time",
+                            "Status",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="px-3 py-2 text-left text-xs font-mono tracking-widest"
+                              style={{ color: "#a0a0a0" }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {staff.map((s, idx) => {
+                          const time = selectedDailyTimes[s.id] ?? "";
+                          const late = isLate(time);
+                          return (
+                            <tr
+                              key={s.id}
+                              style={{
+                                borderBottom:
+                                  "1px solid rgba(255,255,255,0.05)",
+                              }}
+                            >
+                              <td
+                                className="px-3 py-2.5 text-xs font-mono"
+                                style={{ color: "#555" }}
+                              >
+                                {idx + 1}
+                              </td>
+                              <td
+                                className="px-3 py-2.5 font-medium"
+                                style={{ color: "white" }}
+                              >
+                                {s.name}
+                              </td>
+                              <td
+                                className="px-3 py-2.5 text-xs"
+                                style={{ color: "#a0a0a0" }}
+                              >
+                                {s.designation}
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="time"
+                                  data-ocid={`attendance.reporting_time_input.${idx + 1}`}
+                                  value={time}
+                                  onChange={(e) =>
+                                    setReportingTime(
+                                      s.id,
+                                      selectedDay,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="rounded-sm px-2 py-1 text-xs font-mono outline-none transition-all"
+                                  style={{
+                                    background: "rgba(255,255,255,0.06)",
+                                    border: time
+                                      ? late
+                                        ? "1px solid rgba(255,68,68,0.5)"
+                                        : "1px solid rgba(0,255,136,0.4)"
+                                      : "1px solid rgba(255,255,255,0.12)",
+                                    color: time
+                                      ? late
+                                        ? "#ff6666"
+                                        : "#00ff88"
+                                      : "#a0a0a0",
+                                    colorScheme: "dark",
+                                  }}
+                                />
+                              </td>
+                              <td className="px-3 py-2.5">
+                                {time ? (
+                                  <span
+                                    className="px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
+                                    style={{
+                                      background: late
+                                        ? "rgba(255,68,68,0.12)"
+                                        : "rgba(0,255,136,0.12)",
+                                      border: late
+                                        ? "1px solid rgba(255,68,68,0.3)"
+                                        : "1px solid rgba(0,255,136,0.3)",
+                                      color: late ? "#ff4444" : "#00ff88",
+                                    }}
+                                  >
+                                    {late
+                                      ? `Late · ${formatTime12h(time)}`
+                                      : `On Time · ${formatTime12h(time)}`}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: "#555" }}
+                                  >
+                                    Not logged
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Monthly Summary */}
