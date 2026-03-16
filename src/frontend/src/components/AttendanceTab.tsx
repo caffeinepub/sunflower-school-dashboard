@@ -27,8 +27,6 @@ interface Props {
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-// School standard arrival time (09:00)
 const STANDARD_TIME = "09:00";
 
 function formatDateKey(year: number, month: number, day: number): string {
@@ -46,11 +44,16 @@ function isLate(time: string): boolean {
 }
 
 function formatTime12h(time: string): string {
-  if (!time) return "—";
+  if (!time) return "\u2014";
   const [h, m] = time.split(":").map(Number);
   const ampm = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 || 12;
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function getCurrentTimeString(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 const STATUS_CONFIG = {
@@ -59,14 +62,14 @@ const STATUS_CONFIG = {
     color: "#00ff88",
     bg: "rgba(0,255,136,0.15)",
     border: "rgba(0,255,136,0.4)",
-    icon: "✓",
+    icon: "\u2713",
   },
   absent: {
     label: "Absent",
     color: "#ff4444",
     bg: "rgba(255,68,68,0.15)",
     border: "rgba(255,68,68,0.4)",
-    icon: "✗",
+    icon: "\u2717",
   },
   leave: {
     label: "Leave",
@@ -78,14 +81,13 @@ const STATUS_CONFIG = {
 };
 
 function StatusDot({ status }: { status: AttendanceStatus | undefined }) {
-  if (!status) {
+  if (!status)
     return (
       <span
         className="inline-block w-2 h-2 rounded-full"
         style={{ background: "#3a3a3a" }}
       />
     );
-  }
   const cfg = STATUS_CONFIG[status];
   return (
     <span
@@ -118,7 +120,6 @@ export default function AttendanceTab({
       ? Object.keys(todayAttendance).length > 0
       : false;
 
-  // Build calendar grid
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const startOffset = (firstDayOfMonth + 6) % 7;
@@ -181,6 +182,16 @@ export default function AttendanceTab({
       ...prev,
       [key]: { ...(prev[key] ?? {}), [staffId]: status },
     }));
+    // Auto-fill current time when marking Present (only if no time already logged)
+    if (status === "present") {
+      setReportingTimes((prev) => {
+        if (prev[key]?.[staffId]) return prev;
+        return {
+          ...prev,
+          [key]: { ...(prev[key] ?? {}), [staffId]: getCurrentTimeString() },
+        };
+      });
+    }
   }
 
   function markAllPresent(day: number) {
@@ -188,6 +199,16 @@ export default function AttendanceTab({
     const daily: Record<string, AttendanceStatus> = {};
     for (const s of staff) daily[s.id] = "present";
     setAttendance((prev) => ({ ...prev, [key]: daily }));
+    // Auto-fill current time for all staff without an existing time
+    const currentTime = getCurrentTimeString();
+    setReportingTimes((prev) => {
+      const existing = prev[key] ?? {};
+      const updated = { ...existing };
+      for (const s of staff) {
+        if (!updated[s.id]) updated[s.id] = currentTime;
+      }
+      return { ...prev, [key]: updated };
+    });
   }
 
   function setReportingTime(staffId: string, day: number, time: string) {
@@ -198,7 +219,6 @@ export default function AttendanceTab({
     }));
   }
 
-  // Monthly summary
   // biome-ignore lint/correctness/useExhaustiveDependencies: isSunday is stable given viewYear/viewMonth in deps
   const summary = useMemo(() => {
     return staff.map((s) => {
@@ -254,7 +274,6 @@ export default function AttendanceTab({
 
   const selectedFuture = selectedDay ? isFutureDate(selectedDay) : false;
 
-  // Reporting timing for selected day -- late count
   const lateCount = selectedDay
     ? staff.filter((s) => isLate(selectedDailyTimes[s.id] ?? "")).length
     : 0;
@@ -307,7 +326,7 @@ export default function AttendanceTab({
               style={{ color: todayMarked ? "#00ff88" : "#00f5ff" }}
             >
               {todayMarked
-                ? "Today's Attendance Done ✓"
+                ? "Today's Attendance Done \u2713"
                 : "Today's Attendance Not Marked"}
             </p>
             <p className="text-xs" style={{ color: "#a0a0a0" }}>
@@ -344,7 +363,6 @@ export default function AttendanceTab({
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Calendar */}
         <div className="xl:col-span-2 glass-card rounded-sm p-4 space-y-4">
-          {/* Month Nav */}
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -386,7 +404,6 @@ export default function AttendanceTab({
             </button>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 gap-1">
             {DAYS.map((d) => (
               <div
@@ -401,21 +418,16 @@ export default function AttendanceTab({
             ))}
           </div>
 
-          {/* Calendar cells */}
           <div className="grid grid-cols-7 gap-1">
             {calendarCells.map((day, idx) => {
-              if (!day) {
-                // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar spacer cells have no natural key
-                return <div key={`empty-${idx}`} />;
-              }
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar spacer cells have no natural key
+              if (!day) return <div key={`empty-${idx}`} />;
               const key = getDateKey(day);
               const daily = attendance[key] ?? {};
               const future = isFutureDate(day);
               const sunday = isSunday(day);
               const todayCell = isToday(day);
               const selected = selectedDay === day;
-              const dayNum = day;
-
               return (
                 <button
                   type="button"
@@ -462,9 +474,8 @@ export default function AttendanceTab({
                         : "none",
                     }}
                   >
-                    {dayNum}
+                    {day}
                   </span>
-                  {/* Staff dots */}
                   {!sunday && !future && staff.length > 0 && (
                     <div className="flex flex-wrap gap-0.5">
                       {staff.slice(0, 6).map((s) => (
@@ -480,7 +491,6 @@ export default function AttendanceTab({
             })}
           </div>
 
-          {/* Legend */}
           <div
             className="flex items-center gap-4 pt-2 border-t"
             style={{ borderColor: "rgba(255,255,255,0.06)" }}
@@ -543,7 +553,6 @@ export default function AttendanceTab({
                 </div>
               ) : (
                 <>
-                  {/* Summary */}
                   {panelStats && (
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -585,7 +594,6 @@ export default function AttendanceTab({
                     </div>
                   )}
 
-                  {/* Mark All Present */}
                   <button
                     type="button"
                     data-ocid="attendance.mark_all_present_button"
@@ -597,10 +605,9 @@ export default function AttendanceTab({
                       color: "#00ff88",
                     }}
                   >
-                    ✓ Mark All Present
+                    \u2713 Mark All Present
                   </button>
 
-                  {/* Staff list */}
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                     {staff.length === 0 ? (
                       <p
@@ -656,7 +663,7 @@ export default function AttendanceTab({
                                   "absent",
                                   "leave",
                                 ] as AttendanceStatus[]
-                              ).map((st, _stIdx) => {
+                              ).map((st) => {
                                 const cfg = STATUS_CONFIG[st];
                                 const active = status === st;
                                 const ocidMap: Record<
@@ -716,7 +723,7 @@ export default function AttendanceTab({
         </div>
       </div>
 
-      {/* ── Teacher Reporting Timing Section ─────────────────────────────────── */}
+      {/* Teacher Reporting Timing Section */}
       <div className="glass-card rounded-sm">
         <button
           type="button"
@@ -784,7 +791,6 @@ export default function AttendanceTab({
               style={{ overflow: "hidden" }}
             >
               <div className="p-4 space-y-4">
-                {/* Info bar */}
                 <div
                   className="flex items-center gap-2 p-3 rounded-sm text-xs"
                   style={{
@@ -806,7 +812,8 @@ export default function AttendanceTab({
                       09:00 AM
                     </span>
                     . Arrivals after 9:00 AM are marked as{" "}
-                    <span style={{ color: "#ff4444" }}>Late</span>.
+                    <span style={{ color: "#ff4444" }}>Late</span>. Time is
+                    auto-filled when marking Present.
                   </span>
                 </div>
 
@@ -934,8 +941,8 @@ export default function AttendanceTab({
                                     }}
                                   >
                                     {late
-                                      ? `Late · ${formatTime12h(time)}`
-                                      : `On Time · ${formatTime12h(time)}`}
+                                      ? `Late \u00b7 ${formatTime12h(time)}`
+                                      : `On Time \u00b7 ${formatTime12h(time)}`}
                                   </span>
                                 ) : (
                                   <span
@@ -977,7 +984,7 @@ export default function AttendanceTab({
               className="text-sm font-medium tracking-wide"
               style={{ color: "white" }}
             >
-              Monthly Summary — {monthName}
+              Monthly Summary \u2014 {monthName}
             </span>
           </div>
           {summaryOpen ? (
