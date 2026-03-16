@@ -292,13 +292,7 @@ function ReceiptModal({
                 >
                   SUNFLOWER PUBLIC SCHOOL
                 </div>
-                <div
-                  style={{ fontSize: "12px", color: "#555", marginTop: "4px" }}
-                >
-                  Director: Kausar Parween
-                </div>
               </div>
-
               {/* Receipt Title */}
               <div
                 style={{
@@ -871,7 +865,7 @@ function ReceiptModal({
                       textAlign: "center",
                     }}
                   >
-                    Authorized Signature
+                    Incharge
                   </div>
                 </div>
               </div>

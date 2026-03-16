@@ -8,6 +8,7 @@ import {
   ClockIcon,
   TimerIcon,
   UsersIcon,
+  XIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
@@ -192,6 +193,20 @@ export default function AttendanceTab({
         };
       });
     }
+  }
+
+  function clearStatus(staffId: string, day: number) {
+    const key = getDateKey(day);
+    setAttendance((prev) => {
+      const updated = { ...(prev[key] ?? {}) };
+      delete updated[staffId];
+      return { ...prev, [key]: updated };
+    });
+    setReportingTimes((prev) => {
+      const updated = { ...(prev[key] ?? {}) };
+      delete updated[staffId];
+      return { ...prev, [key]: updated };
+    });
   }
 
   function markAllPresent(day: number) {
@@ -656,7 +671,7 @@ export default function AttendanceTab({
                                 </p>
                               </div>
                             </div>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 items-center">
                               {(
                                 [
                                   "present",
@@ -700,6 +715,24 @@ export default function AttendanceTab({
                                   </button>
                                 );
                               })}
+                              {/* Clear button — only shown when a status is set */}
+                              {status !== undefined && (
+                                <button
+                                  type="button"
+                                  data-ocid={`attendance.clear_button.${idx + 1}`}
+                                  onClick={() => clearStatus(s.id, selectedDay)}
+                                  title="Clear attendance (reset to Unmarked)"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-sm transition-all shrink-0"
+                                  style={{
+                                    background: "rgba(255,80,80,0.07)",
+                                    border: "1px solid rgba(255,80,80,0.2)",
+                                    color: "#cc6666",
+                                  }}
+                                >
+                                  <XIcon className="w-3 h-3" />
+                                  <span>Clear</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -871,12 +904,23 @@ export default function AttendanceTab({
                         {staff.map((s, idx) => {
                           const time = selectedDailyTimes[s.id] ?? "";
                           const late = isLate(time);
+                          const staffStatus = selectedDailyAttendance[s.id] as
+                            | AttendanceStatus
+                            | undefined;
+                          const isAbsent = staffStatus === "absent";
+                          const isOnLeave = staffStatus === "leave";
+                          const isAbsentOrLeave = isAbsent || isOnLeave;
                           return (
                             <tr
                               key={s.id}
                               style={{
                                 borderBottom:
                                   "1px solid rgba(255,255,255,0.05)",
+                                background: isAbsent
+                                  ? "rgba(255,68,68,0.04)"
+                                  : isOnLeave
+                                    ? "rgba(245,158,11,0.04)"
+                                    : "transparent",
                               }}
                             >
                               <td
@@ -887,7 +931,9 @@ export default function AttendanceTab({
                               </td>
                               <td
                                 className="px-3 py-2.5 font-medium"
-                                style={{ color: "white" }}
+                                style={{
+                                  color: isAbsentOrLeave ? "#888" : "white",
+                                }}
                               >
                                 {s.name}
                               </td>
@@ -898,36 +944,82 @@ export default function AttendanceTab({
                                 {s.designation}
                               </td>
                               <td className="px-3 py-2">
-                                <input
-                                  type="time"
-                                  data-ocid={`attendance.reporting_time_input.${idx + 1}`}
-                                  value={time}
-                                  onChange={(e) =>
-                                    setReportingTime(
-                                      s.id,
-                                      selectedDay,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="rounded-sm px-2 py-1 text-xs font-mono outline-none transition-all"
-                                  style={{
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: time
-                                      ? late
-                                        ? "1px solid rgba(255,68,68,0.5)"
-                                        : "1px solid rgba(0,255,136,0.4)"
-                                      : "1px solid rgba(255,255,255,0.12)",
-                                    color: time
-                                      ? late
-                                        ? "#ff6666"
-                                        : "#00ff88"
-                                      : "#a0a0a0",
-                                    colorScheme: "dark",
-                                  }}
-                                />
+                                {isAbsent ? (
+                                  <span
+                                    className="px-2 py-1 rounded-sm text-xs font-mono font-semibold"
+                                    style={{
+                                      background: "rgba(255,68,68,0.12)",
+                                      border: "1px solid rgba(255,68,68,0.3)",
+                                      color: "#ff4444",
+                                    }}
+                                  >
+                                    Absent :(
+                                  </span>
+                                ) : isOnLeave ? (
+                                  <span
+                                    className="px-2 py-1 rounded-sm text-xs font-mono font-semibold"
+                                    style={{
+                                      background: "rgba(245,158,11,0.12)",
+                                      border: "1px solid rgba(245,158,11,0.3)",
+                                      color: "#f59e0b",
+                                    }}
+                                  >
+                                    On Leave :(
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="time"
+                                    data-ocid={`attendance.reporting_time_input.${idx + 1}`}
+                                    value={time}
+                                    onChange={(e) =>
+                                      setReportingTime(
+                                        s.id,
+                                        selectedDay,
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="rounded-sm px-2 py-1 text-xs font-mono outline-none transition-all"
+                                    style={{
+                                      background: "rgba(255,255,255,0.06)",
+                                      border: time
+                                        ? late
+                                          ? "1px solid rgba(255,68,68,0.5)"
+                                          : "1px solid rgba(0,255,136,0.4)"
+                                        : "1px solid rgba(255,255,255,0.12)",
+                                      color: time
+                                        ? late
+                                          ? "#ff6666"
+                                          : "#00ff88"
+                                        : "#a0a0a0",
+                                      colorScheme: "dark",
+                                    }}
+                                  />
+                                )}
                               </td>
                               <td className="px-3 py-2.5">
-                                {time ? (
+                                {isAbsent ? (
+                                  <span
+                                    className="px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
+                                    style={{
+                                      background: "rgba(255,68,68,0.12)",
+                                      border: "1px solid rgba(255,68,68,0.3)",
+                                      color: "#ff4444",
+                                    }}
+                                  >
+                                    Absent
+                                  </span>
+                                ) : isOnLeave ? (
+                                  <span
+                                    className="px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
+                                    style={{
+                                      background: "rgba(245,158,11,0.12)",
+                                      border: "1px solid rgba(245,158,11,0.3)",
+                                      color: "#f59e0b",
+                                    }}
+                                  >
+                                    On Leave
+                                  </span>
+                                ) : time ? (
                                   <span
                                     className="px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
                                     style={{
